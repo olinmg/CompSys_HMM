@@ -13,9 +13,9 @@ class HMM():
         self.C_node_list = [self.first_node]
         for t in range(1, T):
             self.C_node_list.append(C_node(t, n, self.C_node_list[-1], self))
-        self.initialize_Z_values() #added for inference algorithm
+        self.initialize_Z_values() 
 
-    def initialize_Z_values(self):  #added for inference algorithm
+    def initialize_Z_values(self):  
         for t in range(self.T):
             for z_node in self.C_node_list[t].Z_node_list:
                 z_node.set_Z_value(0)
@@ -97,7 +97,7 @@ class HMM():
         return np.array(state_as_lists)
 
     @property
-    def initial_state_distribution(self): #added for inference algorithm 
+    def initial_state_distribution(self):  
         return np.array([1.0, 1.0, 1.0]) / 3
 
 
@@ -259,7 +259,7 @@ class X_node():
     def reset(self):
         self.set_X_value(None)
 
-    def observation_probability(self, observation): #added to support inference algorithm
+    def observation_probability(self, observation): 
         if np.isscalar(observation):
             observation = np.array([observation])
         
