@@ -1,6 +1,6 @@
 This folder contains 5 code files.
 File "Graph.py" is a general file, containing functions and classes used in other tasks. The code loads a file from a path, which should be changed to the path of your own file.
-File "log_reg_analysis.py" if for part I. This file also contains a path that should be changed.
+File "log_reg_analysis.py" is for part I. This file also contains a path that should be changed.
 File "Inference Algorithm.py" is for part II. Here, the path should be replaced  as well. You can do this in the top of the document to acces the csv files.
 File "Learning of the parameters.py" is for part III. This code calls functions from "Graph.py", thus the path in "Graph.py" should be changed in regards to above.
 File "Gradient_ascent.py" is for part III. This code also loads a file from a path.
