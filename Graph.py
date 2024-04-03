@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import os
 import re
+from scipy.stats import poisson
 
 class HMM():
     def __init__(self, T, n) -> None:
@@ -12,6 +13,13 @@ class HMM():
         self.C_node_list = [self.first_node]
         for t in range(1, T):
             self.C_node_list.append(C_node(t, n, self.C_node_list[-1], self))
+        self.initialize_Z_values() #added for inference algorithm
+
+    def initialize_Z_values(self):  #added for inference algorithm
+        for t in range(self.T):
+            for z_node in self.C_node_list[t].Z_node_list:
+                z_node.set_Z_value(0)
+
 
     def set_proba_paras(self, para_dict):
         for t in range(self.T):
@@ -88,6 +96,10 @@ class HMM():
             state_as_lists.append(this_t_state)
         return np.array(state_as_lists)
 
+    @property
+    def initial_state_distribution(self): #added for inference algorithm 
+        return np.array([1.0, 1.0, 1.0]) / 3
+
 
 class C_node():
     # possible value: {0, 1, 2} -> serial processing (0 vs 1), or parallel (2) 
@@ -102,7 +114,7 @@ class C_node():
         if t==1:
             self.C_value = 2
         else:
-            self.C_value = None # {0, 1, 2}
+            self.C_value = 0 # {0, 1, 2} #changed from None to 0 to support inference algorithm
 
         # probability parameters
         self.gamma = None
@@ -247,6 +259,15 @@ class X_node():
     def reset(self):
         self.set_X_value(None)
 
+    def observation_probability(self, observation): #added to support inference algorithm
+        if np.isscalar(observation):
+            observation = np.array([observation])
+        
+        prob_matrix = np.zeros((len(observation), 2))
+        prob_matrix[:, 0] = poisson.pmf(observation, self.lambda_Z0)  
+        prob_matrix[:, 1] = poisson.pmf(observation, self.lambda_Z1)  
+        
+        return prob_matrix.squeeze()
 
 def load_csv_as_HMM(csv_file_path):
     # expects a path to a csv file.
