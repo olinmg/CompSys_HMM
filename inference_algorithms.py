@@ -58,8 +58,6 @@ def calculate_conditional_prob_Z(hmm_model, forward_probs, backward_probs, X):
     return conditional_prob_Z
 
 
-
-
 def forward_pass(hmm_model, X):
     T = hmm_model.T
     num_states = 3  
@@ -76,7 +74,7 @@ def forward_pass(hmm_model, X):
                 sum_prob += forward_probs[t - 1, prev_s] * transition_prob * emission_prob[s]
             forward_probs[t, s] = sum_prob
             if sum_prob == 0:
-                print(f"Warning: Zero forward probability at time {t} and state {s}")
+                print(f"Problem at {t} and with state {s}")
     return forward_probs
 
 
@@ -97,7 +95,6 @@ def backward_pass(hmm_model, X):
             backward_probs[t, s] = sum_prob
 
     return backward_probs
-
 
 
 
@@ -141,10 +138,10 @@ conditional_prob_C = calculate_conditional_prob_C(my_hmm, forward_probs, backwar
 # Make sure to pass 'X' here
 conditional_prob_Z = calculate_conditional_prob_Z(my_hmm, forward_probs, backward_probs, X)
 
-print("Conditional probabilities for variable C:")  
+print("Conditional probabilities C:")  
 print(conditional_prob_C)
 
-print("Conditional probabilities for variable Z:")
+print("Conditional probabilities Z:")
 print(conditional_prob_Z)
 
 
@@ -188,8 +185,8 @@ def test_hmm_implementation(hmm_model, num_replications):
     average_difference_C = np.mean(differences_C)
     average_difference_Z = np.mean(differences_Z)
 
-    print("Average difference for C across replications:", average_difference_C)
-    print("Average difference for Z across replications:", average_difference_Z)
+    print("Mean difference C:", average_difference_C)
+    print("Mean difference Z:", average_difference_Z)
 
 
 
@@ -248,13 +245,23 @@ data = process_data_in_folder(folder_path)
 results = apply_inference_algorithm(data)
 
 for i, result in enumerate(results):
-    print(f"Results for Dataset {i+1}:")
+    print(f"Results sataset {i+1}:")
     conditional_prob_C, conditional_prob_Z = result
-    print("Conditional probabilities for variable C:")
+    print("Conditional probabilities C:")
     print(conditional_prob_C)
-    print("Conditional probabilities for variable Z:")
+    print("Conditional probabilities Z:")
     print(conditional_prob_Z)
     print("\n") 
+
+
+
+
+
+
+
+
+
+
 
 
 
