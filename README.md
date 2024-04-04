@@ -1,5 +1,3 @@
-This folder contains 5 code files.
-
 # Graph.py
 Implements the HMM class upon which the other code files operate.
 Can be used to generate forward simulation examples, load existing values (as from given csv files), and to do message passing on the corresponding clique tree.
