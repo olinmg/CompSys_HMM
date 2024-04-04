@@ -93,6 +93,7 @@ class HMM():
             state_as_lists.append(this_t_state)
         return np.array(state_as_lists)
 
+
     def trigger_upwards_pass(self, root):
         '''
         Triggers upwards pass function in all leaf nodes (all X nodes) to a chosen root node.
@@ -104,8 +105,7 @@ class HMM():
         for C in self.C_node_list:
             for Z in C.Z_node_list:
                 Z.X_node.upward_message_passing(root)
-                # actually works, since C node returns when it hasn't received enough messages
-                # otherwise would never execute more than the first loop
+
 
     def trigger_downwards_pass(self, root):
         '''
@@ -124,6 +124,23 @@ class HMM():
             for Z in C.Z_node_list:
                 Z.compute_belief()
                 #print(Z.belief)
+        self.check_clique_calibration()
+    
+    def check_clique_calibration(self, verbose=False):
+        '''
+        Makes sure that the marginalized (s.t. only C is left) beliefs for two Z that are children of the same C are the same.
+        '''
+        cliques_calibrated = True
+        for C in self.C_node_list:
+            c_beliefs = []
+            for Z in C.Z_node_list:
+                c_beliefs.append(Z.belief_C)
+
+            if not all(np.allclose(arr, c_beliefs[0]) for arr in c_beliefs):
+                print("Clique beliefs for this C are not matching: ", C.t)
+                cliques_calibrated = False
+        if verbose:
+            print("Clique calibration successful: ", cliques_calibrated)
 
 class C_node():
     # possible value: {0, 1, 2} -> serial processing (0 vs 1), or parallel (2) 
@@ -181,7 +198,6 @@ class C_node():
         self.transition_matrix = mat
         self.initial_potential = self.transition_matrix
 
-
     def set_C_value(self, new_C_value):
         assert new_C_value in [None, 0, 1, 2]
         self.C_value = new_C_value
@@ -205,7 +221,6 @@ class C_node():
             this_z = z.simulate()
             results_list.append((this_z, z.simulate_children()))
         return results_list
-
 
     def upward_message_passing(self, received_up_message, root, from_C=False):
         '''
@@ -265,7 +280,17 @@ class C_node():
         else:
             # returning after this statement will allow for the next X(t,i) to start its upwards pass in: trigger_upwards_pass
             return
-        
+
+    def remove_array_from_list(self, list_of_arr, arr_to_remove):
+        removed_smth = False
+        new_list = []
+        for arr in list_of_arr:
+            if np.array_equal(arr, arr_to_remove) and not removed_smth:
+                removed_smth = True
+                #cp.remove(arr)
+            else:
+                new_list.append(arr)
+        return new_list
 
     def downward_message_passing(self, received_down_message, root):
         '''
@@ -274,19 +299,17 @@ class C_node():
                                 and ( {C(t), C(t-1)} -> {C(t+1), C(t)} or {C(t), C(t-1)} -> {C(t-1), C(t-2)} )
         Root is always one of the C nodes.
         '''
-
         self.from_downpass_msg = received_down_message  # this always comes from a C node
         all_uppass_msgs = [np.reshape(vec, (3,1)) for vec in self.from_uppass_msg]
         prod_all_up_msgs = np.prod(all_uppass_msgs, axis=0)
         ctmin_ctminmin = None
         ctplus_ct = None
 
-
         if self.t == 0:
             # only need to send messages to the Z children
             for Z_node in self.Z_node_list:
                 # send product of all messages from uppass, besides the one that whas send by the Z_node we are sending this message to
-                filtered_up_msgs = [arr for arr in all_uppass_msgs if not np.array_equal(arr, np.reshape(Z_node.up_message, (3,1)))]
+                filtered_up_msgs = self.remove_array_from_list(copy.deepcopy(all_uppass_msgs), np.reshape(Z_node.up_message, (3,1)))
                 prod_filtered_up_msgs = np.prod(filtered_up_msgs, axis=0)
                 this_down_message = np.array([[0],[0],[1]]) * prod_filtered_up_msgs * received_down_message
                 if np.sum(this_down_message) != 0:
@@ -299,7 +322,7 @@ class C_node():
         if self.t == self.parent_HMM.T-1:
             for Z_node in self.Z_node_list:
             # send product of all messages from uppass, besides the one that whas send by the Z_node we are sending this message to
-                filtered_up_msgs = [arr for arr in all_uppass_msgs if not np.array_equal(arr, np.reshape(Z_node.up_message, (3,1)))]
+                filtered_up_msgs = self.remove_array_from_list(copy.deepcopy(all_uppass_msgs), np.reshape(Z_node.up_message, (3,1)))
                 prod_filtered_up_msgs = np.prod(filtered_up_msgs, axis=0)
                 this_down_message = prod_filtered_up_msgs # [u, v, w] from script
                 mod_tra_mat = copy.deepcopy(self.transition_matrix)
@@ -334,10 +357,10 @@ class C_node():
         # pass message downwards to all connected Z nodes: 
         for Z_node in self.Z_node_list:
             # all uppass msgs, but the one from this Z_node
-            filtered_up_msgs = [arr for arr in all_uppass_msgs if not np.array_equal(arr, np.reshape(Z_node.up_message, (3,1)))]
+            filtered_up_msgs = self.remove_array_from_list(copy.deepcopy(all_uppass_msgs), np.reshape(Z_node.up_message, (3,1)))
             prod_filtered_up_msgs = np.prod(filtered_up_msgs, axis=0)
             # send product of all messages from uppass, besides the one that whas send by the Z_node we are sending this message to
-            this_down_message = ctplus_ct * prod_filtered_up_msgs # [u, v, w] from script
+            this_down_message =  prod_filtered_up_msgs * ctplus_ct # [u, v, w] from script
             mod_tra_mat = copy.deepcopy(self.transition_matrix)
             mod_tra_mat[:, 0] *= this_down_message[0]
             mod_tra_mat[:, 1] *= this_down_message[1]
@@ -446,10 +469,7 @@ class Z_node():
 
 
     def compute_belief(self):
-        # the result should be two dimensional: giving probability for Z=0 and for Z=1
-        # TODO: this returns wrong results
-        beta_belief = self.initial_potential 
-        #print(beta_belief.shape) # (3,2)
+        beta_belief = copy.deepcopy(self.initial_potential) 
         beta_belief[0, :] *= self.from_downpass_msg[0]
         beta_belief[1, :] *= self.from_downpass_msg[1]
         beta_belief[2, :] *= self.from_downpass_msg[2]
@@ -624,7 +644,10 @@ def test_C(shape):
     C_diff_1 = [[] for _ in range(shape[0])]
     C_diff_2 = [[] for _ in range(shape[0])]
 
-    for _ in range(10):
+    Z_diff_0 = [[[] for _ in range(shape[1])] for _ in range(shape[0])]
+    Z_diff_1 = [[[] for _ in range(shape[1])] for _ in range(shape[0])]
+
+    for _ in tqdm(range(100)):
         new_HMM.reset_HMM_values()
         new_HMM.start_simulation()
         root_for_mp = new_HMM.C_node_list[2]
@@ -632,23 +655,17 @@ def test_C(shape):
         new_HMM.trigger_downwards_pass(root_for_mp)
         new_HMM.trigger_belief_comp()
         
-        #new_HMM.show_current_state()
-
         for idx, C_node in enumerate(new_HMM.C_node_list):
-            some_Z = C_node.Z_node_list[3]
-            if C_node.C_value == 0:
-                C_diff_0[idx].append(1 - some_Z.belief_C[0])
-            else:
-                C_diff_0[idx].append(-some_Z.belief_C[0])
-            
-            if C_node.C_value == 1:
-                C_diff_1[idx].append(1 - some_Z.belief_C[1])
-            else:
-                C_diff_1[idx].append(-some_Z.belief_C[1])
-            if C_node.C_value == 2:
-                C_diff_2[idx].append(1 - some_Z.belief_C[2])
-            else:
-                C_diff_2[idx].append(-some_Z.belief_C[2])
+            some_Z = C_node.Z_node_list[0]  # cliques are calibrated, so doesn't matter which one
+            # check the values of C
+            C_diff_0[idx].append((C_node.C_value == 0) - some_Z.belief_C[0])
+            C_diff_1[idx].append((C_node.C_value == 1) - some_Z.belief_C[1])
+            C_diff_2[idx].append((C_node.C_value == 2) - some_Z.belief_C[2])
+
+            # check the values of Z(t,i)
+            for j, this_Z in enumerate(C_node.Z_node_list):
+                Z_diff_0[idx][j].append((this_Z.Z_value == 0) - this_Z.belief_Z[0])
+                Z_diff_1[idx][j].append((this_Z.Z_value == 1) - this_Z.belief_Z[1])
     print("Means for C==0: ", [sum(C_t) / len(C_t) for C_t in C_diff_0])
     print("Means for C==1: ", [sum(C_t) / len(C_t) for C_t in C_diff_1])
     print("Means for C==2: ", [sum(C_t) / len(C_t) for C_t in C_diff_2])
@@ -666,6 +683,7 @@ sim_para_dict = {
     "lambda_Z1": 5.
 }
 
+
 # 1. generate forward simulation as follows:
 new_HMM = HMM(T=100, n=10)  # create a new instance of the HMM
 new_HMM.set_proba_paras(sim_para_dict)  # set probability parameters to values from a dict
@@ -678,18 +696,20 @@ new_HMM.reset_HMM_values()  # reset values of HMM
 new_HMM.load_df(state_df)   # load state_df back into the HMM
 
 # 3. loading a HMM from a given csv file (uses df in background)
-loaded_HMM = load_csv_as_HMM("proj_HMM/Ex_1.csv")   # initializes HMM and sets all available values
-loaded_HMM.show_current_state()    # show the given HMM in text
+#loaded_HMM = load_csv_as_HMM("proj_HMM/Ex_1.csv")   # initializes HMM and sets all available values
+#loaded_HMM.show_current_state()    # show the given HMM in text
 
 # 4. doing message passing on the clique tree of HMM and compute C, Z distributions conditioned on X
-root_for_mp = loaded_HMM.C_node_list[4] # choose a root node from which to execute message passing (not: C_0 or C_T)
-loaded_HMM.trigger_upwards_pass(root_for_mp)    # does upward message passing
-loaded_HMM.trigger_downwards_pass(root_for_mp)  # does downward message passing
-loaded_HMM.trigger_belief_comp()  # computes the beliefs in Z_nodes and conditional distributions for C, Z
+root_for_mp = new_HMM.C_node_list[4] # choose a root node from which to execute message passing (not: C_0 or C_T)
+new_HMM.trigger_upwards_pass(root_for_mp)    # does upward message passing
+new_HMM.trigger_downwards_pass(root_for_mp)  # does downward message passing
+new_HMM.trigger_belief_comp()  # computes the beliefs in Z_nodes and conditional distributions for C, Z
+new_HMM.check_clique_calibration(verbose=True)  # can test if cliques are calibrated on values of C distribution
 
 # 5. generate a whole training datasets, saved as csv to folder "./simulated_datasets"
 generate_training_datasets(T=100, n=10, sim_para_dict=sim_para_dict, nr_datasets=100)
 
 # 6. testing if computed conditional distributions of C_t are correct
 test_C(shape=(10, 4))
+
 '''
