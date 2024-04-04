@@ -19,4 +19,5 @@ File "Learning of the parameters.py" is for part III. This code calls functions 
 # Gradient_ascent.py
 File "Gradient_ascent.py" is for part III. This code also loads a file from a path.
 
+# Other
 The code doesn't require any other setup. Just note that the different files import functions from Graph.py, and remember to check that numpy, pandas, os, re, math, random and scipy is installed and up to date.
